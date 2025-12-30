@@ -44,12 +44,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 2. Bump version locally after successful build
+      # 4️⃣ Bump patch version
       - name: Bump version
         id: bump
+        shell: bash
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          # Adding [skip ci] prevents the workflow from triggering itself
+          # The [skip ci] tag prevents an infinite loop on push to main
           VERSION=$(npm version patch -m "chore(release): %s [skip ci]")
           echo "new_version=$VERSION" >> $GITHUB_OUTPUT
 
