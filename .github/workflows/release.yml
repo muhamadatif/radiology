@@ -3,7 +3,14 @@ name: Build & Release Electron App
 on:
   push:
     branches:
-      - main # triggers only on main (production/build branch)
+      - main
+    paths-ignore:
+      - "**.md" # Don't release on README updates
+
+# Prevent multiple releases from running simultaneously
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -13,57 +20,54 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true # ensures GH_TOKEN is used for git push
+          persist-credentials: true
 
-      # 2️⃣ Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: npm ci
 
-      # 4️⃣ Bump patch version
+      # 1. Build & Distribute FIRST to ensure code is stable before bumping version
+      - name: Build and Package Electron App
+        run: |
+          npm run build
+          npm run dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 2. Bump version locally after successful build
       - name: Bump version
         id: bump
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          VERSION=$(npm version patch -m "chore(release): %s")
+          # Adding [skip ci] prevents the workflow from triggering itself
+          VERSION=$(npm version patch -m "chore(release): %s [skip ci]")
           echo "new_version=$VERSION" >> $GITHUB_OUTPUT
 
-      # 5️⃣ Push version commit & tag
-      - name: Push version commit & tag
-        run: git push origin main --follow-tags
-
-      # 6️⃣ Build the Electron app
-      - name: Build Electron app
-        run: |
-          echo "Building Electron app..."
-          npm run build
-          npm run dist
-
-      # 7️⃣ Wait a little to ensure GitHub recognizes the tag
-      - name: Wait for GitHub tag recognition
-        run: sleep 5
-
-      # 8️⃣ Create GitHub Release
+      # 3. Create the Release and upload artifacts
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.bump.outputs.new_version }}
           name: Release ${{ steps.bump.outputs.new_version }}
           draft: false
           prerelease: false
           files: |
-            release/**/*
+            release/**/*.exe
+            release/**/*.blockmap
+            release/**/latest*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4. Final Step: Push the version change back to main
+      - name: Push version commit & tag
+        run: git push origin main --follow-tags
