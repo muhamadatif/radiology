@@ -35,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 3. BUMP VERSION
+      # 3. BUMP VERSION (FIXED FOR POWERSHELL)
       - name: Bump version
         id: bump
         run: |
@@ -43,16 +43,17 @@ jobs:
           git config user.email "github-actions@github.com"
 
           # Get current version
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          $CURRENT_VERSION = node -p "require('./package.json').version"
           echo "Current version: $CURRENT_VERSION"
 
           # Bump version
-          NEW_VERSION=$(npm version patch -m "chore(release): v%s [skip ci]")
-          CLEAN_VERSION=${NEW_VERSION:1}
+          $NEW_VERSION = npm version patch -m "chore(release): v%s [skip ci]"
+          $CLEAN_VERSION = $NEW_VERSION.Substring(1)  # Remove 'v' prefix
 
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version=$NEW_VERSION" >> $env:GITHUB_OUTPUT
+          echo "clean_version=$CLEAN_VERSION" >> $env:GITHUB_OUTPUT
           echo "Version bumped to: $NEW_VERSION"
+        shell: pwsh # Explicitly use PowerShell
 
       # 4. BUILD
       - name: Build the app
@@ -68,72 +69,70 @@ jobs:
       - name: List built files
         run: |
           echo "=== Built files in release/ ==="
-          find release/ -type f -name "*" 2>/dev/null | head -20 || echo "No files found"
-          echo ""
-          echo "=== Directory structure ==="
-          ls -la release/ || echo "No release directory"
+          dir release /s /b 2>nul || echo "No files found"
+        shell: pwsh
 
       # 7. PUSH TAG
       - name: Push tag to GitHub
         run: |
-          TAG="${{ steps.bump.outputs.new_version }}"
+          $TAG = "${{ steps.bump.outputs.new_version }}"
           echo "Pushing tag: $TAG"
           git push origin $TAG
+        shell: pwsh
 
-      # 8. CREATE RELEASE
+      # 8. CREATE RELEASE (POWERSHELL VERSION)
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.bump.outputs.new_version }}
         run: |
-          echo "=== Creating release for $TAG ==="
+          echo "=== Creating release for $env:TAG ==="
 
           # Wait for tag to propagate
-          sleep 3
+          Start-Sleep -Seconds 3
 
           # Create release
-          gh release create "$TAG" \
-            --title "Release $TAG" \
+          gh release create "$env:TAG" `
+            --title "Release $env:TAG" `
             --generate-notes
 
           echo "=== Uploading files ==="
 
           # Upload installer (.exe)
           echo "Looking for installer..."
-          for file in release/*.exe; do
-            if [ -f "$file" ]; then
-              echo "Uploading installer: $(basename "$file")"
-              gh release upload "$TAG" "$file" --clobber
-            fi
-          done
+          Get-ChildItem -Path "release" -Filter "*.exe" -File | ForEach-Object {
+            echo "Uploading installer: $($_.Name)"
+            gh release upload "$env:TAG" "$($_.FullName)" --clobber
+          }
 
-          # Upload blockmap and YML files (for auto-updates)
+          # Upload blockmap and YML files
           echo "Looking for update files..."
-          for pattern in "release/*.blockmap" "release/*.yml" "release/*.zip"; do
-            for file in $pattern; do
-              if [ -f "$file" ]; then
-                echo "Uploading: $(basename "$file")"
-                gh release upload "$TAG" "$file" --clobber
-              fi
-            done
-          done
+          $patterns = @("*.blockmap", "*.yml", "*.zip")
+          foreach ($pattern in $patterns) {
+            Get-ChildItem -Path "release" -Filter $pattern -File | ForEach-Object {
+              echo "Uploading: $($_.Name)"
+              gh release upload "$env:TAG" "$($_.FullName)" --clobber
+            }
+          }
 
-          # Also check for any other files
+          # Upload any other files
           echo "Checking for other files..."
-          for file in release/*; do
-            if [ -f "$file" ] && [[ ! "$file" == *.exe ]] && [[ ! "$file" == *.blockmap ]] && [[ ! "$file" == *.yml ]]; then
-              echo "Uploading additional file: $(basename "$file")"
-              gh release upload "$TAG" "$file" --clobber
-            fi
-          done
+          Get-ChildItem -Path "release" -File | Where-Object {
+            $_.Extension -notin @('.exe', '.blockmap', '.yml', '.zip')
+          } | ForEach-Object {
+            echo "Uploading additional file: $($_.Name)"
+            gh release upload "$env:TAG" "$($_.FullName)" --clobber
+          }
 
           echo "=== Upload complete ==="
+        shell: pwsh
 
       # 9. PUSH VERSION COMMIT
       - name: Push version commit to main
         run: |
           echo "Pushing version bump to main..."
           git push origin main
+        shell: pwsh
 
       # 10. SYNC DEVELOPMENT BRANCH (Optional)
       - name: Sync development branch
@@ -142,16 +141,18 @@ jobs:
           echo "=== Checking development branch ==="
 
           # Check if development branch exists
-          if git ls-remote --heads origin development | grep -q development; then
+          $hasDevBranch = git ls-remote --heads origin development
+          if ($hasDevBranch) {
             echo "Development branch exists, syncing..."
             git fetch origin development
             git checkout development
             git merge main --no-edit
             git push origin development
             echo "Development branch synced"
-          else
+          } else {
             echo "No development branch found, skipping"
-          fi
+          }
 
           # Return to main
           git checkout main
+        shell: pwsh
