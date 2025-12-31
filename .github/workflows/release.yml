@@ -77,5 +77,14 @@ jobs:
       - name: Push version commit & tag
         shell: bash
         run: |
-          git push origin main
-          git push origin --tags
+          # --follow-tags only pushes tags that are associated with the commits being pushed
+          # This prevents "already exists" errors from pushing all historical tags
+          git push origin main --follow-tags
+
+      # (Add this after the Push version commit & tag step)
+      - name: Sync Development Branch
+        shell: bash
+        run: |
+          git checkout development
+          git merge main
+          git push origin development
