@@ -31,9 +31,6 @@
     perMachine: false,
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
-    installerIcon: "public/icon.ico",
-    uninstallerIcon: "public/icon.ico",
-    installerHeaderIcon: "public/icon.ico",
   },
 
   mac: {
