@@ -181,7 +181,7 @@ function setupIpcHandlers() {
   });
 
   // Skip update
-  ipcMain.on("skip-update", (event, version) => {
+  ipcMain.on("skip-update", (_, version) => {
     console.log(`Skipping update to version ${version}`);
     win?.webContents.send("update-status", `Skipped update to ${version}`);
     setTimeout(() => {

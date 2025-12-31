@@ -1,6 +1,7 @@
 import { useState } from "react";
 import "./App.css";
 import reactLogo from "./assets/react.svg";
+import UpdateNotifier from "./Update";
 import viteLogo from "/electron-vite.animate.svg";
 
 function App() {
@@ -8,6 +9,7 @@ function App() {
 
   return (
     <div className="bg-rose-500 w-full h-dvh">
+      <UpdateNotifier />
       <div>
         <a href="https://electron-vite.github.io" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
