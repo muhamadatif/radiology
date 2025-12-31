@@ -55,6 +55,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 3. CREATE RELEASE
+      # 2.5 Wait for API consistency (Standard 2025 fix for "Not Found" errors)
+      - name: Wait for GitHub API
+        shell: bash
+        run: sleep 5
+
+      # 3. CREATE RELEASE (Optimized for electron-vite/electron-builder)
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -63,11 +69,16 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
-          # Use ** to look into all subfolders created by electron-builder
+          generate_release_notes: true
+          # SPECIFIC PATHS: This avoids the duplicate files in 'win-unpacked'
+          # while finding files in both root and versioned subfolders.
           files: |
-            release/**/*.exe
-            release/**/*.blockmap
-            release/**/latest*.yml
+            release/*.exe
+            release/*.blockmap
+            release/latest*.yml
+            release/${{ steps.bump.outputs.new_version }}/*.exe
+            release/${{ steps.bump.outputs.new_version }}/*.blockmap
+            release/${{ steps.bump.outputs.new_version }}/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
