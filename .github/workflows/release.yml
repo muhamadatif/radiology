@@ -1,15 +1,14 @@
-name: Build & Release Electron App
+name: Build & Release
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths-ignore:
       - "**.md"
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -19,12 +18,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Checkout repository
+      # 1. CHECKOUT
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-          persist-credentials: true
 
+      # 2. SETUP
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -34,56 +35,123 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 1. BUMP VERSION
+      # 3. BUMP VERSION
       - name: Bump version
         id: bump
-        shell: bash
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          VERSION=$(npm version patch -m "chore(release): %s [skip ci]")
-          echo "new_version=$VERSION" >> $GITHUB_OUTPUT
 
-      # 2. BUILD
-      - name: Build and Package Electron App
-        run: |
-          npm run build
-          npm run dist
+          # Get current version
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          echo "Current version: $CURRENT_VERSION"
+
+          # Bump version
+          NEW_VERSION=$(npm version patch -m "chore(release): v%s [skip ci]")
+          CLEAN_VERSION=${NEW_VERSION:1}
+
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "clean_version=$CLEAN_VERSION" >> $GITHUB_OUTPUT
+          echo "Version bumped to: $NEW_VERSION"
+
+      # 4. BUILD
+      - name: Build the app
+        run: npm run build
+
+      # 5. PACKAGE
+      - name: Package for distribution
+        run: npm run dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. CREATE RELEASE & UPLOAD (Using GitHub CLI for 2025 stability)
+      # 6. DEBUG - See what was built
+      - name: List built files
+        run: |
+          echo "=== Built files in release/ ==="
+          find release/ -type f -name "*" 2>/dev/null | head -20 || echo "No files found"
+          echo ""
+          echo "=== Directory structure ==="
+          ls -la release/ || echo "No release directory"
+
+      # 7. PUSH TAG
+      - name: Push tag to GitHub
+        run: |
+          TAG="${{ steps.bump.outputs.new_version }}"
+          echo "Pushing tag: $TAG"
+          git push origin $TAG
+
+      # 8. CREATE RELEASE
       - name: Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
+          TAG: ${{ steps.bump.outputs.new_version }}
         run: |
-          TAG="${{ steps.bump.outputs.new_version }}"
+          echo "=== Creating release for $TAG ==="
 
-          # Create the release (ignore error if it exists)
+          # Wait for tag to propagate
+          sleep 3
+
+          # Create release
           gh release create "$TAG" \
             --title "Release $TAG" \
-            --generate-notes || echo "Release already exists"
+            --generate-notes
 
-          # Upload files individually to avoid duplicate/path conflicts
-          # Use --clobber to overwrite existing files without crashing
-          echo "Uploading assets..."
-          gh release upload "$TAG" release/*.exe --clobber || true
-          gh release upload "$TAG" release/*.blockmap --clobber || true
-          gh release upload "$TAG" release/latest*.yml --clobber || true
-          # Also check the versioned subfolder just in case
-          gh release upload "$TAG" release/$TAG/*.exe --clobber || true
+          echo "=== Uploading files ==="
 
-      # 4. PUSH CHANGES BACK TO REPO
-      - name: Push version commit & tag
-        shell: bash
-        run: git push origin main --follow-tags
+          # Upload installer (.exe)
+          echo "Looking for installer..."
+          for file in release/*.exe; do
+            if [ -f "$file" ]; then
+              echo "Uploading installer: $(basename "$file")"
+              gh release upload "$TAG" "$file" --clobber
+            fi
+          done
 
-      # 5. SYNC DEVELOPMENT
-      - name: Sync Development Branch
-        shell: bash
+          # Upload blockmap and YML files (for auto-updates)
+          echo "Looking for update files..."
+          for pattern in "release/*.blockmap" "release/*.yml" "release/*.zip"; do
+            for file in $pattern; do
+              if [ -f "$file" ]; then
+                echo "Uploading: $(basename "$file")"
+                gh release upload "$TAG" "$file" --clobber
+              fi
+            done
+          done
+
+          # Also check for any other files
+          echo "Checking for other files..."
+          for file in release/*; do
+            if [ -f "$file" ] && [[ ! "$file" == *.exe ]] && [[ ! "$file" == *.blockmap ]] && [[ ! "$file" == *.yml ]]; then
+              echo "Uploading additional file: $(basename "$file")"
+              gh release upload "$TAG" "$file" --clobber
+            fi
+          done
+
+          echo "=== Upload complete ==="
+
+      # 9. PUSH VERSION COMMIT
+      - name: Push version commit to main
         run: |
-          git fetch origin development:development
-          git checkout development
-          git merge main
-          git push origin development
+          echo "Pushing version bump to main..."
+          git push origin main
+
+      # 10. SYNC DEVELOPMENT BRANCH (Optional)
+      - name: Sync development branch
+        if: success()
+        run: |
+          echo "=== Checking development branch ==="
+
+          # Check if development branch exists
+          if git ls-remote --heads origin development | grep -q development; then
+            echo "Development branch exists, syncing..."
+            git fetch origin development
+            git checkout development
+            git merge main --no-edit
+            git push origin development
+            echo "Development branch synced"
+          else
+            echo "No development branch found, skipping"
+          fi
+
+          # Return to main
+          git checkout main

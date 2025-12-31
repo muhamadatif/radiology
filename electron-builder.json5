@@ -1,17 +1,21 @@
 {
   $schema: "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  appId: "YourAppID",
+  appId: "com.yourcompany.radiology",
+  productName: "Radiology",
   asar: true,
-  productName: "radiology",
+
   directories: {
-    output: "release/${version}",
+    output: "release",
   },
-  files: ["dist", "dist-electron"],
-  publish: null,
-  mac: {
-    target: ["dmg"],
-    artifactName: "${productName}-Mac-${version}-Installer.${ext}",
+
+  files: ["dist", "dist-electron", "!**/.vscode", "!**/*.map"],
+
+  publish: {
+    provider: "github",
+    owner: "muhamadatif",
+    repo: "radiology",
   },
+
   win: {
     target: [
       {
@@ -19,16 +23,27 @@
         arch: ["x64"],
       },
     ],
-    artifactName: "${productName}.${ext}",
+    icon: "public/icon.ico",
   },
+
   nsis: {
     oneClick: false,
     perMachine: false,
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
+    installerIcon: "public/icon.ico",
+    uninstallerIcon: "public/icon.ico",
+    installerHeaderIcon: "public/icon.ico",
   },
+
+  mac: {
+    target: ["dmg"],
+    icon: "public/icon.icns",
+    category: "public.app-category.medical",
+  },
+
   linux: {
     target: ["AppImage"],
-    artifactName: "${productName}-Linux-${version}.${ext}",
+    category: "Medical",
   },
 }
