@@ -63,12 +63,11 @@ jobs:
           draft: false
           prerelease: false
           fail_on_unmatched_files: false
-          # Targeted paths for electron-vite output
+          # Use ** to look into all subfolders created by electron-builder
           files: |
-            release/*.exe
-            release/*.blockmap
-            release/latest*.yml
-            release/${{ steps.bump.outputs.new_version }}/*.exe
+            release/**/*.exe
+            release/**/*.blockmap
+            release/**/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
