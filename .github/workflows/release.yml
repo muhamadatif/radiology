@@ -5,9 +5,8 @@ on:
     branches:
       - main
     paths-ignore:
-      - "**.md" # Don't release on README updates
+      - "**.md"
 
-# Prevent multiple releases from running simultaneously
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
@@ -35,7 +34,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # 1. Build & Distribute FIRST to ensure code is stable before bumping version
+      # 1. BUMP VERSION FIRST
+      # Since electron-vite reads versioning during the build process,
+      # we must bump the version BEFORE running 'npm run dist'.
+      - name: Bump version
+        id: bump
+        shell: bash
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          VERSION=$(npm version patch -m "chore(release): %s [skip ci]")
+          echo "new_version=$VERSION" >> $GITHUB_OUTPUT
+
+      # 2. BUILD (Now it will build with the NEW version number)
       - name: Build and Package Electron App
         run: |
           npm run build
@@ -43,19 +54,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 2. Bump version locally after successful build
-      # 4️⃣ Bump patch version
-      - name: Bump version
-        id: bump
-        shell: bash
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          # The [skip ci] tag prevents an infinite loop on push to main
-          VERSION=$(npm version patch -m "chore(release): %s [skip ci]")
-          echo "new_version=$VERSION" >> $GITHUB_OUTPUT
-
-      # 3. Create the Release and upload artifacts
+      # 3. CREATE RELEASE
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -63,13 +62,20 @@ jobs:
           name: Release ${{ steps.bump.outputs.new_version }}
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
+          # Targeted paths for electron-vite output
           files: |
-            release/**/*.exe
-            release/**/*.blockmap
-            release/**/latest*.yml
+            release/*.exe
+            release/*.blockmap
+            release/latest*.yml
+            release/${{ steps.bump.outputs.new_version }}/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 4. Final Step: Push the version change back to main
+      # 4. PUSH CHANGES BACK TO REPO
+      # We use shell: bash to ensure the push and tags are handled correctly
       - name: Push version commit & tag
-        run: git push origin main --follow-tags
+        shell: bash
+        run: |
+          git push origin main
+          git push origin --tags
