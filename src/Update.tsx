@@ -136,7 +136,7 @@ const UpdateNotifier: React.FC = () => {
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg shadow-lg mb-2">
           <div className="flex items-start">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <svg
                 className="h-5 w-5 text-red-400"
                 fill="currentColor"
@@ -187,7 +187,7 @@ const UpdateNotifier: React.FC = () => {
       {showUpdateDialog && (
         <div className="bg-white p-4 rounded-lg shadow-lg border border-green-200">
           <div className="flex items-start mb-3">
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <svg
                 className="h-6 w-6 text-green-500"
                 fill="currentColor"
