@@ -53,6 +53,11 @@ function createWindow() {
 function initializeAutoUpdater() {
   console.log("Initializing auto-updater...");
 
+  // --- ADD THIS ---
+  autoUpdater.requestHeaders = {
+    Authorization: `token ${process.env.GH_TOKEN}`,
+  };
+
   // Configure auto-updater
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
