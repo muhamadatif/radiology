@@ -1,4 +1,5 @@
 // main.ts
+import dotenv from "dotenv";
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import { autoUpdater } from "electron-updater";
 import path from "node:path";
@@ -8,6 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The built directory structure
 process.env.APP_ROOT = path.join(__dirname, "..");
+
+dotenv.config({
+  path: path.resolve(__dirname, "..", ".env"),
+});
 
 export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
