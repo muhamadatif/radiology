@@ -29,11 +29,17 @@
   },
 
   nsis: {
-    oneClick: false,
+    oneClick: true, // 🔥 CHANGED FROM false TO true
     perMachine: false,
-    allowToChangeInstallationDirectory: true,
+    allowToChangeInstallationDirectory: false, // 🔥 CHANGED FROM true TO false
     deleteAppDataOnUninstall: false,
     artifactName: "${productName}.Setup.${version}.${ext}",
+    installerIcon: "public/icon.ico",
+    uninstallerIcon: "public/icon.ico",
+    license: "license.txt", // Optional: add a license file
+    createDesktopShortcut: true,
+    createStartMenuShortcut: true,
+    shortcutName: "Radiology",
   },
 
   mac: {
