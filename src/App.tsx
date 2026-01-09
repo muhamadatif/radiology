@@ -8,7 +8,7 @@ function App() {
   const [count, setCount] = useState(0);
 
   return (
-    <div className="bg-gray-50 w-full h-dvh">
+    <div className="bg-gray-100 w-full h-dvh">
       <UpdateNotifier />
       <div>
         <a href="https://electron-vite.github.io" target="_blank">
